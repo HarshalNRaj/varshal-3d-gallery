@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VarShal — a gallery adrift</title>
+<meta name="description" content="VarShal: an immersive 3D world of floating islands linked by light to a glowing gallery at the center of the sky." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#05060F;
+    --bg-dusk:#1B1440;
+    --bg-mid:#3A2B6B;
+    --amber:#F4B860;
+    --starlight:#E9E6F7;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg-deep);
+    overflow:hidden;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--starlight);
+  }
+  canvas#scene{
+    position:fixed; inset:0; display:block; width:100%; height:100%;
+    cursor:grab;
+  }
+  canvas#scene:active{ cursor:grabbing; }
+
+  #ui{
+    position:fixed; top:0; left:0; right:0;
+    padding: clamp(20px, 4vw, 48px);
+    pointer-events:none;
+    z-index:10;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    opacity:0;
+    animation: fadeIn 2.2s ease forwards;
+    animation-delay: 1s;
+  }
+  @keyframes fadeIn{ to{ opacity:1; } }
+
+  .title{
+    font-family:'Cormorant Garamond', serif;
+    font-weight:600;
+    font-size: clamp(2.4rem, 6vw, 4.6rem);
+    letter-spacing: 0.14em;
+    margin:0;
+    color:var(--starlight);
+    text-shadow: 0 0 24px rgba(244,184,96,0.35), 0 0 60px rgba(244,184,96,0.12);
+  }
+  .subtitle{
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-weight:400;
+    font-size: clamp(0.95rem, 1.6vw, 1.25rem);
+    letter-spacing:0.04em;
+    color: rgba(233,230,247,0.7);
+    margin: 6px 0 0 3px;
+  }
+
+  #hint{
+    position:fixed;
+    bottom: clamp(18px, 3vw, 32px);
+    left: clamp(20px, 4vw, 48px);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(233,230,247,0.45);
+    pointer-events:none;
+    z-index:10;
+    opacity:0;
+    animation: fadeIn 2s ease forwards;
+    animation-delay: 3.4s;
+  }
+
+  #caption{
+    position:fixed;
+    bottom: clamp(18px, 3vw, 32px);
+    right: clamp(18px, 3vw, 32px);
+    max-width: min(340px, 84vw);
+    padding: 18px 22px;
+    background: rgba(27,20,64,0.42);
+    border: 1px solid rgba(244,184,96,0.28);
+    border-radius: 2px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    z-index: 10;
+    opacity:0;
+    transform: translateY(8px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    pointer-events:none;
+  }
+  #caption.visible{ opacity:1; transform:translateY(0); }
+  #caption .eyebrow{
+    font-size:0.62rem;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color: var(--amber);
+    margin:0 0 6px 0;
+  }
+  #caption h3{
+    font-family:'Cormorant Garamond', serif;
+    font-weight:600;
+    font-size:1.35rem;
+    margin:0 0 8px 0;
+    letter-spacing:0.02em;
+  }
+  #caption p{
+    font-size:0.82rem;
+    line-height:1.55;
+    margin:0;
+    color: rgba(233,230,247,0.78);
+    font-weight:400;
+  }
+
+  #loading{
+    position:fixed; inset:0; z-index:100;
+    background: var(--bg-deep);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column;
+    gap: 14px;
+    transition: opacity 1s ease;
+  }
+  #loading .mark{
+    font-family:'Cormorant Garamond', serif;
+    font-size:1.6rem;
+    letter-spacing:0.3em;
+    color: var(--starlight);
+    opacity:0.85;
+  }
+  #loading .error{
+    max-width: 480px;
+    text-align:center;
+    font-size:0.8rem;
+    line-height:1.6;
+    color: rgba(233,230,247,0.65);
+    padding: 0 24px;
+    display:none;
+  }
+  #loading.has-error .bar{ display:none; }
+  #loading.has-error .error{ display:block; }
+  #loading .bar{
+    width: 160px; height:1px;
+    background: rgba(233,230,247,0.15);
+    overflow:hidden;
+    position:relative;
+  }
+  #loading .bar::after{
+    content:'';
+    position:absolute; left:-40%; top:0; bottom:0; width:40%;
+    background: var(--amber);
+    animation: sweep 1.1s ease-in-out infinite;
+  }
+  @keyframes sweep{
+    0%{ left:-40%; }
+    100%{ left:100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    #ui, #hint{ animation: none; opacity:1; }
+  }
+
+  #audio-toggle{
+    position:fixed;
+    top: clamp(20px, 4vw, 48px);
+    right: clamp(20px, 4vw, 48px);
+    z-index:11;
+    width:40px; height:40px;
+    border-radius:50%;
+    border:1px solid rgba(244,184,96,0.3);
+    background: rgba(27,20,64,0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--starlight);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    opacity:0;
+    animation: fadeIn 2s ease forwards;
+    animation-delay: 3.4s;
+    transition: border-color 0.3s ease, background 0.3s ease;
+  }
+  #audio-toggle:hover{ border-color: rgba(244,184,96,0.7); background: rgba(27,20,64,0.65); }
+  #audio-toggle svg{ width:16px; height:16px; }
+
+  #wish-overlay{
+    position:fixed; inset:0; z-index:50;
+    background: rgba(5,6,15,0.55);
+    backdrop-filter: blur(4px);
+    display:none;
+    align-items:center; justify-content:center;
+  }
+  #wish-overlay.visible{ display:flex; }
+  #wish-panel{
+    width:min(420px, 88vw);
+    padding: 28px 30px;
+    background: rgba(27,20,64,0.75);
+    border: 1px solid rgba(244,184,96,0.35);
+    box-shadow: 0 0 60px rgba(244,184,96,0.08);
+  }
+  #wish-panel .eyebrow{
+    font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase;
+    color: var(--amber); margin:0 0 8px 0;
+  }
+  #wish-panel h3{
+    font-family:'Cormorant Garamond', serif; font-weight:600;
+    font-size:1.5rem; margin:0 0 6px 0;
+  }
+  #wish-panel p.help{
+    font-size:0.8rem; color: rgba(233,230,247,0.6); margin:0 0 18px 0; line-height:1.5;
+  }
+  #wish-input{
+    width:100%;
+    background: rgba(5,6,15,0.5);
+    border: 1px solid rgba(233,230,247,0.2);
+    color: var(--starlight);
+    font-family:'Space Grotesk', sans-serif;
+    font-size:0.9rem;
+    padding: 12px 14px;
+    outline:none;
+    resize:none;
+  }
+  #wish-input:focus{ border-color: rgba(244,184,96,0.6); }
+  #wish-actions{
+    display:flex; justify-content:flex-end; gap:10px; margin-top:16px;
+  }
+  #wish-actions button{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase;
+    padding: 10px 18px;
+    background:transparent;
+    color: var(--starlight);
+    border: 1px solid rgba(233,230,247,0.25);
+    cursor:pointer;
+    transition: border-color 0.25s ease, color 0.25s ease;
+  }
+  #wish-actions button:hover{ border-color: var(--amber); color: var(--amber); }
+  #wish-actions button.primary{ border-color: rgba(244,184,96,0.55); color: var(--amber); }
+
+  /* ---- Chapter system: HUD, story beats, transition veil ---- */
+  #hud{
+    display:none;
+    position:fixed;
+    top: clamp(20px, 4vw, 48px);
+    left: clamp(20px, 4vw, 48px);
+    z-index:11;
+    font-family:'Space Grotesk', sans-serif;
+    opacity:0;
+    animation: fadeIn 2s ease forwards;
+    animation-delay: 4s;
+    pointer-events:none;
+  }
+  #hud .chapter{
+    font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase;
+    color: var(--amber); margin:0 0 4px 0;
+  }
+  #hud .objective{
+    font-size:0.72rem; letter-spacing:0.03em;
+    color: rgba(233,230,247,0.75);
+  }
+
+  #story-overlay{
+    position:fixed; inset:0; z-index:60;
+    background: rgba(5,6,15,0.7);
+    backdrop-filter: blur(6px);
+    display:none;
+    align-items:center; justify-content:center;
+  }
+  #story-overlay.visible{ display:flex; }
+  #story-panel{
+    width:min(480px, 88vw);
+    padding: 34px 36px;
+    background: rgba(20,14,48,0.82);
+    border: 1px solid rgba(244,184,96,0.3);
+    box-shadow: 0 0 70px rgba(244,184,96,0.1);
+  }
+  #story-panel .eyebrow{
+    font-size:0.62rem; letter-spacing:0.2em; text-transform:uppercase;
+    color: var(--amber); margin:0 0 10px 0;
+  }
+  #story-panel h3{
+    font-family:'Cormorant Garamond', serif; font-weight:600;
+    font-size:1.7rem; margin:0 0 14px 0; letter-spacing:0.01em;
+  }
+  #story-panel p{
+    font-size:0.88rem; line-height:1.7; color: rgba(233,230,247,0.82);
+    margin:0 0 20px 0;
+  }
+  #story-continue{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase;
+    padding: 11px 22px;
+    background:transparent;
+    color: var(--amber);
+    border: 1px solid rgba(244,184,96,0.5);
+    cursor:pointer;
+    transition: background 0.25s ease;
+  }
+  #story-continue:hover{ background: rgba(244,184,96,0.12); }
+
+  #fade-veil{
+    position:fixed; inset:0; z-index:80;
+    background: #05060F;
+    opacity:0;
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="mark">V A R S H A L</div>
+  <div class="bar"></div>
+  <div class="error" id="loading-error"></div>
+</div>
+
+<canvas id="scene"></canvas>
+
+<div id="ui">
+  <h1 class="title">VARSHAL</h1>
+  <p class="subtitle">a gallery adrift among nine floating islands</p>
+</div>
+<div id="hint">drag to look around · hover the shards · click an island to leave a light</div>
+
+<button id="audio-toggle" aria-label="Toggle ambient sound" title="Toggle ambient sound">
+  <svg id="audio-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="display:none">
+    <path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7"/><path d="M19 6a9 9 0 010 12"/>
+  </svg>
+  <svg id="audio-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+    <path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/>
+  </svg>
+</button>
+
+<div id="hud">
+  <p class="chapter" id="hud-chapter">Chapter I VarShal</p>
+  <p class="objective" id="hud-objective">Fragments recovered: 0 / 5</p>
+</div>
+
+<div id="story-overlay">
+  <div id="story-panel">
+    <p class="eyebrow" id="story-eyebrow">VarShal</p>
+    <h3 id="story-title"></h3>
+    <p id="story-body"></p>
+    <button id="story-continue">Continue</button>
+  </div>
+</div>
+
+<div id="fade-veil"></div>
+
+<audio id="bg-music" loop preload="auto" src="assets/audio/theme.aac"></audio>
+
+<div id="wish-overlay">
+  <div id="wish-panel">
+    <p class="eyebrow">Leave a Light</p>
+    <h3>Leave something for whoever crosses next</h3>
+    <p class="help">A short wish, a line, a name — it will stay lit above this island for anyone who visits after you. Some say that's what crossing over has always meant.</p>
+    <textarea id="wish-input" rows="2" maxlength="80" placeholder="Write something small..."></textarea>
+    <div id="wish-actions">
+      <button id="wish-cancel">Cancel</button>
+      <button id="wish-submit" class="primary">Leave it here</button>
+    </div>
+  </div>
+</div>
+
+<div id="caption">
+  <p class="eyebrow" id="cap-eyebrow">Exhibit</p>
+  <h3 id="cap-title"></h3>
+  <p id="cap-body"></p>
+</div>
+
+<script>
+  // Watchdog: if the module below never boots (e.g. this file was opened
+  // directly as file:// and the browser blocked the module imports, or a
+  // CDN request failed/was blocked by network policy), surface a real
+  // message instead of hanging on the loading screen forever.
+  window.__VARSHAL_BOOTED = false;
+  window.addEventListener('error', function (e) {
+    showLoadError((e && e.message) ? e.message : 'A script failed to load.');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    showLoadError((e && e.reason && e.reason.message) ? e.reason.message : 'A resource failed to load.');
+  });
+  function showLoadError(detail) {
+    if (window.__VARSHAL_BOOTED) return;
+    var el = document.getElementById('loading');
+    var msg = document.getElementById('loading-error');
+    if (!el || !msg || el.classList.contains('has-error')) return;
+    el.classList.add('has-error');
+    msg.textContent =
+      "This scene couldn't load (" + detail + "). If you opened this file directly " +
+      "by double-clicking it, your browser is blocking the 3D libraries from loading " +
+      "over file://. Serve it from a local server instead \u2014 e.g. run " +
+      "\"python3 -m http.server\" in this folder and open http://localhost:8000 \u2014 " +
+      "or deploy it to Netlify/GitHub Pages, both of which work immediately.";
+  }
+  setTimeout(function () {
+    if (!window.__VARSHAL_BOOTED) showLoadError('taking too long \u2014 likely blocked by browser or network');
+  }, 9000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ---------------------------------------------------------
+   VarShal — an immersive floating-island gallery.
+   Single-file, dependency-light, deploy-anywhere build.
+--------------------------------------------------------- */
+
+const canvas = document.getElementById('scene');
+const loadingEl = document.getElementById('loading');
+const captionEl = document.getElementById('caption');
+const capEyebrow = document.getElementById('cap-eyebrow');
+const capTitle = document.getElementById('cap-title');
+const capBody = document.getElementById('cap-body');
+const wishOverlay = document.getElementById('wish-overlay');
+const wishInput = document.getElementById('wish-input');
+const wishCancelBtn = document.getElementById('wish-cancel');
+const wishSubmitBtn = document.getElementById('wish-submit');
+const audioToggleBtn = document.getElementById('audio-toggle');
+const audioIconOn = document.getElementById('audio-icon-on');
+const audioIconOff = document.getElementById('audio-icon-off');
+const hudChapterEl = document.getElementById('hud-chapter');
+const hudObjectiveEl = document.getElementById('hud-objective');
+const storyOverlay = document.getElementById('story-overlay');
+const storyEyebrowEl = document.getElementById('story-eyebrow');
+const storyTitleEl = document.getElementById('story-title');
+const storyBodyEl = document.getElementById('story-body');
+const storyContinueBtn = document.getElementById('story-continue');
+const fadeVeil = document.getElementById('fade-veil');
+
+// ---------- Renderer / Scene / Camera ----------
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0c0a24, 0.011);
+
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 26, 90);
+
+// ---------- Chapters: two travelable worlds sharing one sky/starfield ----------
+const varshalGroup = new THREE.Group();
+const meridianGroup = new THREE.Group();
+meridianGroup.visible = false;
+scene.add(varshalGroup, meridianGroup);
+
+// ---------- Lighting ----------
+const hemi = new THREE.HemisphereLight(0x6a5acd, 0x0a0818, 0.55);
+scene.add(hemi);
+
+const moon = new THREE.DirectionalLight(0x9fb4ff, 0.6);
+moon.position.set(-40, 60, -30);
+scene.add(moon);
+
+const coreLight = new THREE.PointLight(0xf4b860, 6, 90, 2);
+coreLight.position.set(0, 8, 0);
+varshalGroup.add(coreLight);
+
+// ---------- Sky dome (gradient shader) ----------
+const skyGeo = new THREE.SphereGeometry(300, 32, 32);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: {
+    uTime: { value: 0 },
+    colorTop: { value: new THREE.Color(0x05060f) },
+    colorMid: { value: new THREE.Color(0x241a52) },
+    colorHorizon: { value: new THREE.Color(0x5d3f8c) },
+  },
+  vertexShader: `
+    varying vec3 vPos;
+    void main(){
+      vPos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 colorTop;
+    uniform vec3 colorMid;
+    uniform vec3 colorHorizon;
+    uniform float uTime;
+    varying vec3 vPos;
+    void main(){
+      float h = normalize(vPos).y;
+      float t1 = smoothstep(-0.1, 0.5, h);
+      float t2 = smoothstep(0.4, 1.0, h);
+      vec3 col = mix(colorHorizon, colorMid, t1);
+      col = mix(col, colorTop, t2);
+      float shimmer = sin(uTime * 0.05 + vPos.x * 0.01) * 0.015;
+      col += shimmer;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+});
+const sky = new THREE.Mesh(skyGeo, skyMat);
+scene.add(sky);
+
+// ---------- Stars ----------
+function makeStars(count, radius, size, color, opacity) {
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = radius * (0.6 + Math.random() * 0.4);
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(THREE.MathUtils.randFloatSpread(2) * 0.9);
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = Math.abs(r * Math.cos(phi)) * 0.6 + 10;
+    positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color, size, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  });
+  return new THREE.Points(geo, mat);
+}
+scene.add(makeStars(1400, 260, 0.7, 0xE9E6F7, 0.8));
+scene.add(makeStars(500, 180, 1.3, 0xF4B860, 0.5));
+
+// ---------- Aurora ribbons ----------
+const auroraMat = new THREE.ShaderMaterial({
+  side: THREE.DoubleSide,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  uniforms: {
+    uTime: { value: 0 },
+    uColorA: { value: new THREE.Color(0x6ee7c9) },
+    uColorB: { value: new THREE.Color(0xF4B860) },
+    uSeed: { value: 0 },
+  },
+  vertexShader: `
+    uniform float uTime;
+    uniform float uSeed;
+    varying float vY;
+    varying float vX;
+    void main(){
+      vec3 pos = position;
+      float wave = sin(pos.x * 0.05 + uTime * 0.25 + uSeed) * 3.5
+                 + sin(pos.x * 0.11 + uTime * 0.4 + uSeed * 2.0) * 1.6;
+      pos.z += wave;
+      pos.y += sin(pos.x * 0.03 + uTime * 0.15 + uSeed) * 2.2;
+      vY = (pos.y - 40.0) / 20.0;
+      vX = pos.x;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uColorA;
+    uniform vec3 uColorB;
+    uniform float uTime;
+    varying float vY;
+    varying float vX;
+    void main(){
+      float mixAmt = 0.5 + 0.5 * sin(vX * 0.02 + uTime * 0.3);
+      vec3 col = mix(uColorA, uColorB, mixAmt);
+      float edge = 1.0 - abs(vY);
+      float alpha = clamp(edge, 0.0, 1.0) * 0.22;
+      gl_FragColor = vec4(col, alpha);
+    }
+  `,
+});
+
+function buildAurora(segments, width, yBase, zBase, seed) {
+  const geo = new THREE.PlaneGeometry(width, 22, segments, 1);
+  geo.rotateX(Math.PI / 2.4);
+  const mat = auroraMat.clone();
+  mat.uniforms.uSeed.value = seed;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(0, yBase, zBase);
+  return mesh;
+}
+const aurora1 = buildAurora(48, 220, 62, -90, 0.0);
+const aurora2 = buildAurora(48, 180, 50, -70, 2.4);
+aurora2.rotation.y = 0.3;
+const aurora3 = buildAurora(48, 160, 44, 100, 4.8);
+aurora3.rotation.y = Math.PI + 0.2;
+scene.add(aurora1, aurora2, aurora3);
+const auroraMeshes = [aurora1, aurora2, aurora3];
+
+// ---------- Fireflies (ambient particles) ----------
+const fireflyCount = 220;
+const fireflyGeo = new THREE.BufferGeometry();
+const fireflyPos = new Float32Array(fireflyCount * 3);
+const fireflySeed = new Float32Array(fireflyCount);
+for (let i = 0; i < fireflyCount; i++) {
+  fireflyPos[i * 3] = (Math.random() - 0.5) * 90;
+  fireflyPos[i * 3 + 1] = Math.random() * 40 - 6;
+  fireflyPos[i * 3 + 2] = (Math.random() - 0.5) * 90;
+  fireflySeed[i] = Math.random() * Math.PI * 2;
+}
+fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+const fireflyMat = new THREE.PointsMaterial({
+  color: 0xF4B860, size: 0.35, transparent: true, opacity: 0.85,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
+scene.add(fireflies);
+const fireflyBasePos = fireflyPos.slice();
+
+// ---------- Materials ----------
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x2b2440, roughness: 0.95, metalness: 0.05, flatShading: true });
+const mossMat = new THREE.MeshStandardMaterial({ color: 0x3f5b4a, roughness: 0.9, metalness: 0.0, flatShading: true });
+const crystalMat = new THREE.MeshPhysicalMaterial({
+  color: 0xF4B860, emissive: 0xF4B860, emissiveIntensity: 1.4,
+  roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.92,
+});
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x241a2e, roughness: 1, flatShading: true });
+const leafMat = new THREE.MeshStandardMaterial({ color: 0x4f7a5c, roughness: 0.85, flatShading: true });
+const bridgeMat = new THREE.MeshBasicMaterial({ color: 0xF4B860, transparent: true, opacity: 0.35 });
+
+// ---------- Island builder ----------
+function buildIsland(radius) {
+  const group = new THREE.Group();
+
+  // rocky underside
+  const under = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.95, radius * 1.4, 7, 1), rockMat);
+  under.rotation.x = Math.PI;
+  under.position.y = -radius * 0.5;
+  under.scale.y = 0.8 + Math.random() * 0.3;
+  group.add(under);
+
+  // grassy top
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.05, radius * 0.5, 7), mossMat);
+  top.position.y = radius * 0.05;
+  top.userData.isIslandTop = true;
+  top.userData.islandGroup = group;
+  group.add(top);
+  group.userData.topMesh = top;
+  group.userData.radius = radius;
+
+  // scattered crystals
+  const crystalCount = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < crystalCount; i++) {
+    const c = new THREE.Mesh(new THREE.OctahedronGeometry(radius * (0.12 + Math.random() * 0.1), 0), crystalMat);
+    const a = Math.random() * Math.PI * 2;
+    const d = radius * (0.3 + Math.random() * 0.5);
+    c.position.set(Math.cos(a) * d, radius * 0.35 + Math.random() * 0.4, Math.sin(a) * d);
+    c.rotation.set(Math.random(), Math.random(), Math.random());
+    group.add(c);
+  }
+
+  // small trees
+  const treeCount = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < treeCount; i++) {
+    const tree = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * radius, 0.06 * radius, 0.5 * radius, 5), trunkMat);
+    trunk.position.y = 0.25 * radius;
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.28 * radius, 0.55 * radius, 6), leafMat);
+    leaf.position.y = 0.65 * radius;
+    tree.add(trunk, leaf);
+    const a = Math.random() * Math.PI * 2;
+    const d = radius * (0.15 + Math.random() * 0.65);
+    tree.position.set(Math.cos(a) * d, radius * 0.28, Math.sin(a) * d);
+    tree.scale.setScalar(0.6 + Math.random() * 0.5);
+    group.add(tree);
+  }
+
+  group.userData.bobOffset = Math.random() * Math.PI * 2;
+  group.userData.bobSpeed = 0.3 + Math.random() * 0.25;
+  group.userData.baseY = 0;
+  return group;
+}
+
+// ---------- Place islands in a ring around the core ----------
+const islandCount = 8;
+const islands = [];
+const islandTopMeshes = [];
+const ringRadius = 34;
+for (let i = 0; i < islandCount; i++) {
+  const angle = (i / islandCount) * Math.PI * 2 + Math.random() * 0.25;
+  const r = ringRadius + (Math.random() - 0.5) * 8;
+  const size = 4.5 + Math.random() * 3.5;
+  const island = buildIsland(size);
+  const y = -2 + Math.sin(i * 1.7) * 6 + (Math.random() - 0.5) * 4;
+  island.position.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
+  island.userData.baseY = y;
+  island.rotation.y = Math.random() * Math.PI * 2;
+  islands.push(island);
+  islandTopMeshes.push(island.userData.topMesh);
+  varshalGroup.add(island);
+}
+
+// ---------- Central obelisk gallery core ----------
+const coreGroup = new THREE.Group();
+const obelisk = new THREE.Mesh(
+  new THREE.ConeGeometry(2.4, 14, 5, 1),
+  new THREE.MeshPhysicalMaterial({
+    color: 0xF4B860, emissive: 0xF4B860, emissiveIntensity: 1.1,
+    roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.85,
+  })
+);
+obelisk.position.y = 5;
+coreGroup.add(obelisk);
+
+const ringGeo1 = new THREE.TorusGeometry(5.2, 0.06, 12, 64);
+const ringGeo2 = new THREE.TorusGeometry(7.4, 0.05, 12, 64);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xF4B860, transparent: true, opacity: 0.55 });
+const ring1 = new THREE.Mesh(ringGeo1, ringMat);
+ring1.rotation.x = Math.PI / 2.4;
+const ring2 = new THREE.Mesh(ringGeo2, ringMat.clone());
+ring2.rotation.x = Math.PI / 1.7;
+ring2.material.opacity = 0.32;
+coreGroup.add(ring1, ring2);
+
+// base platform for the core
+const basePlatform = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7, 1.4, 8), rockMat);
+basePlatform.position.y = -1;
+coreGroup.add(basePlatform);
+const baseMoss = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.2, 8), mossMat);
+baseMoss.position.y = -0.28;
+coreGroup.add(baseMoss);
+
+varshalGroup.add(coreGroup);
+
+// ---------- Light bridges (islands -> core) ----------
+const bridgeCurves = [];
+islands.forEach((island) => {
+  const start = island.position.clone();
+  const end = new THREE.Vector3(0, 4, 0);
+  const mid = start.clone().lerp(end, 0.5).add(new THREE.Vector3(0, 4 + Math.random() * 3, 0));
+  const curve = new THREE.CatmullRomCurve3([start, mid, end]);
+  bridgeCurves.push(curve);
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.035, 6, false), bridgeMat);
+  varshalGroup.add(tube);
+});
+
+// particles traveling along bridges
+const streamCount = bridgeCurves.length * 6;
+const streamGeo = new THREE.BufferGeometry();
+const streamPos = new Float32Array(streamCount * 3);
+streamGeo.setAttribute('position', new THREE.BufferAttribute(streamPos, 3));
+const streamMat = new THREE.PointsMaterial({
+  color: 0xF4E7C7, size: 0.28, transparent: true, opacity: 0.9,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const streamPoints = new THREE.Points(streamGeo, streamMat);
+varshalGroup.add(streamPoints);
+const streamData = [];
+for (let c = 0; c < bridgeCurves.length; c++) {
+  for (let p = 0; p < 6; p++) {
+    streamData.push({ curveIndex: c, t: p / 6, speed: 0.06 + Math.random() * 0.03 });
+  }
+}
+
+// ---------- Exhibit shards (interactive) ----------
+const exhibits = [
+  { title: 'The First Ember', body: 'Where the obelisk was lit, and the islands began to drift apart, slowly, so no one would notice leaving.' },
+  { title: 'Windward Bloom', body: 'Petals cast in glass, grown from a wind no one here remembers feeling.' },
+  { title: 'The Quiet Bridge', body: 'A path of light between two islands that were never meant to touch.' },
+  { title: 'Hourglass Reef', body: 'Sand suspended mid-fall, measuring a day that refuses to end.' },
+  { title: 'Lantern Choir', body: 'Six small lights that hum in a key only the night can hear.' },
+  { title: 'The Last Cartographer', body: 'A map of a sky that keeps redrawing itself while you sleep.' },
+];
+
+const exhibitGroup = new THREE.Group();
+const exhibitMeshes = [];
+exhibits.forEach((data, i) => {
+  const radius = 10 + (i % 2) * 2.4;
+  const speed = 0.08 + (i % 3) * 0.02;
+  const startAngle = (i / exhibits.length) * Math.PI * 2;
+  const yOff = 5 + Math.sin(i * 2.1) * 2.5;
+
+  const geo = new THREE.IcosahedronGeometry(0.55, 0);
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xE9E6F7, emissive: 0xF4B860, emissiveIntensity: 0.9,
+    roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.95,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData = { ...data, radius, speed, startAngle, yOff, baseScale: 1 };
+  exhibitMeshes.push(mesh);
+  exhibitGroup.add(mesh);
+});
+varshalGroup.add(exhibitGroup);
+
+// ---------- Map fragments (Chapter I objective — find these to wake the obelisk) ----------
+const fragmentGeo = new THREE.TetrahedronGeometry(0.5, 0);
+const fragmentMat = new THREE.MeshPhysicalMaterial({
+  color: 0xE7B8F4, emissive: 0xB07AF0, emissiveIntensity: 1.3,
+  roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.95,
+});
+const fragmentMeshes = [];
+const fragmentHostIslands = [...islands].sort(() => Math.random() - 0.5).slice(0, 5);
+fragmentHostIslands.forEach((island, i) => {
+  const mesh = new THREE.Mesh(fragmentGeo, fragmentMat.clone());
+  const a = Math.random() * Math.PI * 2;
+  const d = island.userData.radius * 0.4;
+  mesh.position.set(Math.cos(a) * d, island.userData.radius * 0.9 + 1.2, Math.sin(a) * d);
+  mesh.userData = { bobOffset: Math.random() * Math.PI * 2, collected: false, index: i, isFragment: true };
+  island.add(mesh); // rides along with the island's bob + rotation
+  fragmentMeshes.push(mesh);
+});
+
+// ---------- "Leave a Light" — visitor-planted wishes, persisted locally ----------
+const WISH_KEY = 'varshal_wishes_v1';
+const MAX_WISHES = 60;
+const wishMeshes = [];
+const wishGeo = new THREE.IcosahedronGeometry(0.4, 0);
+
+function loadWishes() {
+  try {
+    const raw = localStorage.getItem(WISH_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveWishes(list) {
+  try {
+    localStorage.setItem(WISH_KEY, JSON.stringify(list.slice(-MAX_WISHES)));
+  } catch (e) {
+    /* storage unavailable — wishes still work for this session */
+  }
+}
+
+function createWishMesh(x, y, z, message) {
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xBFF7E3, emissive: 0x6ee7c9, emissiveIntensity: 1.1,
+    roughness: 0.2, metalness: 0.2, transparent: true, opacity: 0.95,
+  });
+  const mesh = new THREE.Mesh(wishGeo, mat);
+  mesh.position.set(x, y, z);
+  mesh.userData = {
+    title: 'A light left behind', body: message,
+    bobOffset: Math.random() * Math.PI * 2, bobSpeed: 0.5 + Math.random() * 0.3,
+    baseY: y, isWish: true,
+  };
+  varshalGroup.add(mesh);
+  wishMeshes.push(mesh);
+  return mesh;
+}
+
+function plantWish(point, message) {
+  const clean = (message || '').trim().slice(0, 80);
+  if (!clean) return;
+  const y = point.y + 0.9 + Math.random() * 0.6;
+  createWishMesh(point.x, y, point.z, clean);
+  const stored = loadWishes();
+  stored.push({ x: point.x, y, z: point.z, message: clean, t: Date.now() });
+  saveWishes(stored);
+  playChime();
+}
+
+(function restoreWishes() {
+  loadWishes().forEach((w) => createWishMesh(w.x, w.y, w.z, w.message));
+})();
+
+// ---------- Raycasting / hover + click interaction ----------
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2(-10, -10);
+let hovered = null;
+
+function onPointerMove(e) {
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  pointer.x = (x / window.innerWidth) * 2 - 1;
+  pointer.y = -(y / window.innerHeight) * 2 + 1;
+}
+window.addEventListener('mousemove', onPointerMove);
+window.addEventListener('touchmove', onPointerMove, { passive: true });
+
+// distinguish a tap/click from an orbit-drag by tracking movement distance
+let downPos = null;
+function onPointerDown(e) {
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  downPos = { x, y };
+  initAudio();
+}
+function onPointerUp(e) {
+  if (!downPos) return;
+  const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+  const y = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+  const dist = Math.hypot(x - downPos.x, y - downPos.y);
+  downPos = null;
+  if (dist > 6) return; // was a drag, not a tap
+  if (!controls.enabled) return; // ignore taps during intro
+  if (wishOverlay.classList.contains('visible')) return;
+  if (storyOverlay.classList.contains('visible')) return;
+
+  raycaster.setFromCamera(pointer, camera);
+
+  if (gameState.chapter === 'varshal') {
+    // 1. collectible map fragments take priority
+    const fragHit = raycaster.intersectObjects(fragmentMeshes.filter(m => !m.userData.collected))[0];
+    if (fragHit) { collectFragment(fragHit.object); return; }
+
+    // 2. the obelisk, once awakened, opens the way to Meridian
+    const obeliskHit = raycaster.intersectObject(obelisk)[0];
+    if (obeliskHit) {
+      if (gameState.portalActive) { travelToMeridian(); }
+      else { flashHint("The obelisk is still dark. Find the scattered map fragments first."); }
+      return;
+    }
+
+    // 3. otherwise, tapping an island surface leaves a light
+    const hit = raycaster.intersectObjects(islandTopMeshes)[0];
+    if (hit) openWishForm(hit.point);
+  } else if (gameState.chapter === 'meridian') {
+    const landmarkHit = raycaster.intersectObjects(meridianLandmarks.map(l => l.mesh))[0];
+    if (landmarkHit) {
+      const landmark = meridianLandmarks.find(l => l.mesh === landmarkHit.object);
+      openLandmarkStory(landmark);
+      return;
+    }
+    const beaconHit = raycaster.intersectObject(returnBeacon)[0];
+    if (beaconHit) { travelToVarShal(); }
+  }
+}
+window.addEventListener('pointerdown', onPointerDown);
+window.addEventListener('pointerup', onPointerUp);
+
+// ---------- Wish-form modal wiring ----------
+let pendingWishPoint = null;
+function openWishForm(point) {
+  pendingWishPoint = point.clone();
+  wishInput.value = '';
+  wishOverlay.classList.add('visible');
+  captionEl.classList.remove('visible');
+  hovered = null;
+  setTimeout(() => wishInput.focus(), 50);
+}
+function closeWishForm() {
+  wishOverlay.classList.remove('visible');
+  pendingWishPoint = null;
+}
+wishCancelBtn.addEventListener('click', closeWishForm);
+wishSubmitBtn.addEventListener('click', () => {
+  if (pendingWishPoint) plantWish(pendingWishPoint, wishInput.value);
+  closeWishForm();
+});
+wishInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    wishSubmitBtn.click();
+  } else if (e.key === 'Escape') {
+    closeWishForm();
+  }
+});
+wishOverlay.addEventListener('click', (e) => {
+  if (e.target === wishOverlay) closeWishForm();
+});
+
+// ---------- Controls ----------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 18;
+controls.maxDistance = 130;
+controls.maxPolarAngle = Math.PI * 0.62;
+controls.minPolarAngle = Math.PI * 0.12;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.25;
+controls.enabled = false; // enabled after intro
+controls.target.set(0, 4, 0);
+
+// ---------- Post-processing ----------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight), 0.85, 0.55, 0.15
+);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+// =====================================================================
+// CHAPTER SYSTEM — game state, story beats, and the Meridian city
+// =====================================================================
+
+const gameState = {
+  chapter: 'varshal',
+  fragmentsCollected: 0,
+  fragmentsTotal: fragmentMeshes.length,
+  portalActive: false,
+  visitedMeridian: false,
+  visitedArchive: false,
+  visitedShowroom: false,
+};
+
+function updateHUD() {
+  if (gameState.chapter === 'varshal') {
+    hudChapterEl.textContent = 'Chapter I VarShal';
+    hudObjectiveEl.textContent = gameState.portalActive
+      ? 'The obelisk is awake. Tap it to cross over.'
+      : `Fragments recovered: ${gameState.fragmentsCollected} / ${gameState.fragmentsTotal}`;
+  } else {
+    const done = (gameState.visitedArchive ? 1 : 0) + (gameState.visitedShowroom ? 1 : 0);
+    hudChapterEl.textContent = 'Chapter II Meridian';
+    hudObjectiveEl.textContent = done >= 2
+      ? 'Both landmarks explored. Return to VarShal anytime.'
+      : `Landmarks explored: ${done} / 2`;
+  }
+}
+
+let hintTimer = null;
+const baseHintText = 'drag to look around · hover the shards · click an island to leave a light';
+function flashHint(text) {
+  const el = document.getElementById('hint');
+  el.textContent = text;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { el.textContent = baseHintText; }, 3200);
+}
+
+// ---------- Story beats ----------
+let storyQueue = [];
+function showStoryBeat(eyebrow, title, body) {
+  storyQueue.push({ eyebrow, title, body });
+  if (storyQueue.length === 1) renderNextStoryBeat();
+}
+function renderNextStoryBeat() {
+  if (storyQueue.length === 0) return;
+  const beat = storyQueue[0];
+  storyEyebrowEl.textContent = beat.eyebrow;
+  storyTitleEl.textContent = beat.title;
+  storyBodyEl.textContent = beat.body;
+  storyOverlay.classList.add('visible');
+}
+storyContinueBtn.addEventListener('click', () => {
+  storyOverlay.classList.remove('visible');
+  storyQueue.shift();
+  setTimeout(renderNextStoryBeat, 350);
+});
+
+// ---------- Fragment collection — each piece reveals the next line of Wren's story ----------
+const FRAGMENT_STORY = [
+  {
+    eyebrow: 'A Fragment, Recovered — I',
+    title: 'Patience',
+    body: 'The piece is warm, like it was held recently. Scratched along one edge, barely legible: "If you\u2019re reading this, you found the first one. Good. That means you\u2019re patient. Meridian doesn\u2019t let anyone through who isn\u2019t. \u2014 W."',
+  },
+  {
+    eyebrow: 'A Fragment, Recovered — II',
+    title: 'What Drifting Means',
+    body: 'More of the same handwriting, smaller this time: "I used to think the islands drifted because nothing held them together. I was wrong. They drift because everything down here has already left something behind \u2014 lights, names, people who didn\u2019t make it back."',
+  },
+  {
+    eyebrow: 'A Fragment, Recovered — III',
+    title: 'Her Sister',
+    body: '"My sister crossed first. She said the city on the other side doesn\u2019t feel like a place you arrive at. It feels like a place that\u2019s been waiting for you the entire time you didn\u2019t know you were lost."',
+  },
+  {
+    eyebrow: 'A Fragment, Recovered — IV',
+    title: 'Four Years of Silence',
+    body: 'This piece is cracked clean through. "She stopped writing back four years ago. I don\u2019t know if that means she\u2019s still there, or if there was never anywhere to write back from. I\u2019m going anyway. \u2014 W."',
+  },
+  {
+    eyebrow: 'A Fragment, Recovered — V',
+    title: 'Come',
+    body: 'The last piece carries no message \u2014 just one word, etched deep enough to still catch the light: Come.',
+  },
+];
+
+function collectFragment(mesh) {
+  if (mesh.userData.collected) return;
+  mesh.userData.collected = true;
+  gsap.to(mesh.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 0.5, ease: 'back.in(2)', onComplete: () => { mesh.visible = false; } });
+  gameState.fragmentsCollected++;
+  playChime();
+  updateHUD();
+  hovered = null;
+  captionEl.classList.remove('visible');
+
+  const beat = FRAGMENT_STORY[gameState.fragmentsCollected - 1];
+  if (beat) showStoryBeat(beat.eyebrow, beat.title, beat.body);
+
+  if (gameState.fragmentsCollected >= gameState.fragmentsTotal) {
+    gameState.portalActive = true;
+    updateHUD();
+    showStoryBeat(
+      'VarShal',
+      'The obelisk wakes',
+      'All five pieces, whole again. The obelisk doesn\u2019t just glow now \u2014 it remembers the shape of a door. Wren went through something like this once. She never wrote down what it felt like. Maybe that part was only ever meant for whoever followed.'
+    );
+  }
+}
+
+// =====================================================================
+// MERIDIAN — the sci-fi city chapter (art gallery + product showroom)
+// =====================================================================
+
+const meridianMats = {
+  tower: new THREE.MeshStandardMaterial({ color: 0x141428, roughness: 0.55, metalness: 0.4 }),
+  towerDark: new THREE.MeshStandardMaterial({ color: 0x0b0b1a, roughness: 0.6, metalness: 0.35 }),
+  ground: new THREE.MeshStandardMaterial({ color: 0x0a0a16, roughness: 0.35, metalness: 0.6 }),
+  neonCyan: new THREE.MeshBasicMaterial({ color: 0x5ff0e0 }),
+  neonMagenta: new THREE.MeshBasicMaterial({ color: 0xe85fd0 }),
+};
+
+// ground
+const meridianGround = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), meridianMats.ground);
+meridianGround.rotation.x = -Math.PI / 2;
+meridianGround.position.y = -0.5;
+meridianGroup.add(meridianGround);
+
+// street grid lines (emissive strips)
+const gridMat = new THREE.MeshBasicMaterial({ color: 0x3a4a7a, transparent: true, opacity: 0.5 });
+for (let i = -100; i <= 100; i += 20) {
+  const lineA = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 200), gridMat);
+  lineA.rotation.x = -Math.PI / 2; lineA.position.set(i, -0.49, 0);
+  const lineB = new THREE.Mesh(new THREE.PlaneGeometry(200, 0.15), gridMat);
+  lineB.rotation.x = -Math.PI / 2; lineB.position.set(0, -0.49, i);
+  meridianGroup.add(lineA, lineB);
+}
+
+// procedural towers with neon window bands
+function buildTower(x, z, w, h, d, neonColor) {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Math.random() > 0.5 ? meridianMats.tower : meridianMats.towerDark);
+  body.position.y = h / 2;
+  group.add(body);
+
+  const bandCount = Math.max(2, Math.floor(h / 6));
+  for (let i = 0; i < bandCount; i++) {
+    const bandMat = new THREE.MeshBasicMaterial({ color: neonColor, transparent: true, opacity: 0.85 });
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w * 1.01, 0.15, d * 1.01), bandMat);
+    band.position.y = (i + 0.5) * (h / bandCount);
+    group.add(band);
+  }
+  const spireMat = new THREE.MeshBasicMaterial({ color: neonColor });
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, h * 0.25, 6), spireMat);
+  spire.position.y = h + (h * 0.125);
+  group.add(spire);
+
+  group.position.set(x, 0, z);
+  return group;
+}
+
+const towerColors = [0x5ff0e0, 0xe85fd0, 0x8a7cf7];
+for (let i = 0; i < 46; i++) {
+  const x = (Math.random() - 0.5) * 190;
+  const z = (Math.random() - 0.5) * 190;
+  if (Math.hypot(x, z) < 22) continue; // keep the plaza near spawn clear
+  const w = 3 + Math.random() * 5;
+  const d = 3 + Math.random() * 5;
+  const h = 8 + Math.random() * 34;
+  const color = towerColors[Math.floor(Math.random() * towerColors.length)];
+  meridianGroup.add(buildTower(x, z, w, h, d, color));
+}
+
+// ---------- Landmark: The Archive (digital art gallery) ----------
+function buildLandmark(x, z, color, label) {
+  const group = new THREE.Group();
+  const spire = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.6, 3.4, 22, 8),
+    new THREE.MeshStandardMaterial({ color: 0x10101f, roughness: 0.4, metalness: 0.5 })
+  );
+  spire.position.y = 11;
+  group.add(spire);
+
+  for (let i = 0; i < 5; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(3.2 + i * 0.15, 0.06, 8, 32),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 2 + i * 4.5;
+    group.add(ring);
+  }
+
+  const marker = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.1, 0),
+    new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 1.4, roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.95 })
+  );
+  marker.position.y = 24;
+  group.add(marker);
+  group.userData.marker = marker;
+
+  const glow = new THREE.PointLight(color, 3, 30, 2);
+  glow.position.y = 12;
+  group.add(glow);
+
+  group.position.set(x, 0, z);
+  meridianGroup.add(group);
+  return { mesh: marker, group, label };
+}
+
+const archiveLandmark = buildLandmark(-16, -8, 0xe85fd0, 'Archive');
+const showroomLandmark = buildLandmark(16, -8, 0x5ff0e0, 'Showroom');
+
+const meridianLandmarks = [
+  {
+    mesh: archiveLandmark.mesh,
+    eyebrow: 'The Archive',
+    title: 'A sketch, added later',
+    body: 'Most of what\u2019s kept here was donated \u2014 frame after frame, unlabeled. Except one. A small pencil sketch of an island chain, pinned slightly crooked, like it was added after the exhibit was already finished. No plaque. No name. Just islands, drawn by someone who clearly used to live among them.',
+    key: 'visitedArchive',
+  },
+  {
+    mesh: showroomLandmark.mesh,
+    eyebrow: 'The Showroom',
+    title: 'The Wayfinder',
+    body: 'A single object turns slowly under its own light: a device built to find a way through places that shouldn\u2019t connect. There\u2019s a small worn notch on one side, like a thumb rested there thousands of times. It still works. It\u2019s just never been used to go anywhere but here. \u2014 Swap this panel\u2019s copy for your own product, and this pedestal becomes yours.',
+    key: 'visitedShowroom',
+  },
+];
+
+function openLandmarkStory(landmark) {
+  const data = meridianLandmarks.find(l => l.mesh === landmark.mesh) || landmark;
+  const alreadyHad = gameState[data.key];
+  gameState[data.key] = true;
+  updateHUD();
+  showStoryBeat(data.eyebrow, data.title, data.body);
+
+  if (!alreadyHad && gameState.visitedArchive && gameState.visitedShowroom) {
+    showStoryBeat(
+      'Meridian',
+      'What Meridian remembers',
+      'Between the crooked sketch and the worn edge of the Wayfinder, one thing is certain: Wren made it. Whether she\u2019s still here, or whether this city just keeps careful record of everyone who ever crossed \u2014 that part, she never wrote down either. Back in VarShal, the lights other visitors left behind are still burning. Maybe that\u2019s what crossing over has always meant: leaving something lit for whoever follows.'
+    );
+  }
+}
+
+// ---------- Return beacon (Meridian -> VarShal) ----------
+const returnBeacon = new THREE.Mesh(
+  new THREE.OctahedronGeometry(1.3, 0),
+  new THREE.MeshPhysicalMaterial({ color: 0xF4B860, emissive: 0xF4B860, emissiveIntensity: 1.3, roughness: 0.2, metalness: 0.2, transparent: true, opacity: 0.95 })
+);
+returnBeacon.position.set(0, 3, 10);
+meridianGroup.add(returnBeacon);
+const returnBeaconLight = new THREE.PointLight(0xF4B860, 3, 20, 2);
+returnBeaconLight.position.copy(returnBeacon.position);
+meridianGroup.add(returnBeaconLight);
+
+// ---------- Meridian traffic — streaking light particles between towers ----------
+const trafficCount = 40;
+const trafficGeo = new THREE.BufferGeometry();
+const trafficPos = new Float32Array(trafficCount * 3);
+trafficGeo.setAttribute('position', new THREE.BufferAttribute(trafficPos, 3));
+const trafficMat = new THREE.PointsMaterial({ color: 0xBFEFFF, size: 0.5, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+const trafficPoints = new THREE.Points(trafficGeo, trafficMat);
+meridianGroup.add(trafficPoints);
+const trafficData = [];
+for (let i = 0; i < trafficCount; i++) {
+  trafficData.push({
+    angle: Math.random() * Math.PI * 2,
+    radius: 30 + Math.random() * 70,
+    height: 4 + Math.random() * 26,
+    speed: 0.15 + Math.random() * 0.25,
+  });
+}
+
+// ---------- Chapter transitions ----------
+
+function travelToMeridian() {
+  if (gameState.chapter !== 'varshal') return;
+  controls.enabled = false;
+  gsap.to(fadeVeil, {
+    opacity: 1, duration: 0.9, ease: 'power2.inOut',
+    onComplete: () => {
+      varshalGroup.visible = false;
+      meridianGroup.visible = true;
+      gameState.chapter = 'meridian';
+      camera.position.set(0, 10, 34);
+      controls.target.set(0, 4, 0);
+      controls.autoRotate = false;
+      controls.minDistance = 8;
+      controls.maxDistance = 160;
+
+      gsap.to(skyMat.uniforms.colorTop.value, { r: 0.02, g: 0.02, b: 0.06, duration: 2.2 });
+      gsap.to(skyMat.uniforms.colorMid.value, { r: 0.05, g: 0.08, b: 0.16, duration: 2.2 });
+      gsap.to(skyMat.uniforms.colorHorizon.value, { r: 0.25, g: 0.1, b: 0.3, duration: 2.2 });
+      scene.fog.color.setHex(0x05060f);
+      scene.fog.density = 0.014;
+
+      gsap.to(fadeVeil, { opacity: 0, duration: 1.1, delay: 0.15, ease: 'power2.inOut' });
+      updateHUD();
+      setTimeout(() => { controls.enabled = true; }, 400);
+
+      if (!gameState.visitedMeridian) {
+        gameState.visitedMeridian = true;
+        showStoryBeat(
+          'Meridian',
+          'The other sky',
+          'The sky here does not drift \u2014 it hums. Meridian: a city built to outlast the memory of the world that made it. If Wren made it this far, she isn\u2019t waiting at the door. But two places in this skyline still remember visitors. Find them \u2014 they might remember her too.'
+        );
+      }
+    },
+  });
+}
+
+function travelToVarShal() {
+  if (gameState.chapter !== 'meridian') return;
+  controls.enabled = false;
+  gsap.to(fadeVeil, {
+    opacity: 1, duration: 0.9, ease: 'power2.inOut',
+    onComplete: () => {
+      meridianGroup.visible = false;
+      varshalGroup.visible = true;
+      gameState.chapter = 'varshal';
+      camera.position.set(0, 12, 40);
+      controls.target.set(0, 4, 0);
+      controls.autoRotate = true;
+      controls.minDistance = 18;
+      controls.maxDistance = 130;
+
+      gsap.to(skyMat.uniforms.colorTop.value, { r: 0.02, g: 0.024, b: 0.06, duration: 2.2 });
+      gsap.to(skyMat.uniforms.colorMid.value, { r: 0.14, g: 0.1, b: 0.32, duration: 2.2 });
+      gsap.to(skyMat.uniforms.colorHorizon.value, { r: 0.36, g: 0.25, b: 0.55, duration: 2.2 });
+      scene.fog.color.setHex(0x0c0a24);
+      scene.fog.density = 0.011;
+
+      gsap.to(fadeVeil, { opacity: 0, duration: 1.1, delay: 0.15, ease: 'power2.inOut' });
+      updateHUD();
+      setTimeout(() => { controls.enabled = true; }, 400);
+    },
+  });
+}
+
+// ---------- Ambient generative audio (no audio files — built from oscillators) ----------
+let audioCtx = null;
+let masterGain = null;
+let audioStarted = false;
+let audioMuted = false;
+
+function updateAudioIcons() {
+  audioIconOn.style.display = audioMuted ? 'none' : 'block';
+  audioIconOff.style.display = audioMuted ? 'block' : 'none';
+}
+
+const bgMusicEl = document.getElementById('bg-music');
+
+function initAudio() {
+  if (audioStarted) return;
+  audioStarted = true;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.0;
+    masterGain.connect(audioCtx.destination);
+
+    // masterGain now only carries the short chime SFX (fragment pickups,
+    // wishes left behind) — the continuous background bed is the
+    // uploaded track below, not a synthesized drone.
+    masterGain.gain.linearRampToValueAtTime(audioMuted ? 0 : 0.5, audioCtx.currentTime + 2.5);
+    updateAudioIcons();
+
+    if (bgMusicEl) {
+      bgMusicEl.volume = audioMuted ? 0 : 0.55;
+      const playPromise = bgMusicEl.play();
+      if (playPromise && playPromise.catch) playPromise.catch(() => {});
+    }
+  } catch (e) {
+    audioStarted = false; // Web Audio unavailable — fail silently
+  }
+}
+
+function playChime() {
+  if (!audioCtx || audioMuted) return;
+  const now = audioCtx.currentTime;
+  const notes = [659.25, 987.77, 1318.51]; // bright, small bell
+  notes.forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+    osc.connect(g);
+    g.connect(masterGain);
+    const start = now + i * 0.09;
+    g.gain.setValueAtTime(0, start);
+    g.gain.linearRampToValueAtTime(0.12, start + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + 1.4);
+    osc.start(start);
+    osc.stop(start + 1.5);
+  });
+}
+
+audioToggleBtn.addEventListener('click', () => {
+  const wasStarted = audioStarted;
+  initAudio();
+  if (wasStarted) {
+    audioMuted = !audioMuted;
+    updateAudioIcons();
+    if (masterGain && audioCtx) {
+      masterGain.gain.linearRampToValueAtTime(audioMuted ? 0 : 0.5, audioCtx.currentTime + 0.6);
+    }
+  }
+  // if this click was the one that started audio, initAudio() already
+  // ramped it in unmuted and synced the icons — nothing more to do.
+});
+
+// ---------- Resize ----------
+function onResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+
+// ---------- Intro camera flythrough ----------
+function startIntro() {
+  const path = [
+    { x: 0, y: 55, z: 120 },
+    { x: 32, y: 20, z: 55 },
+    { x: -18, y: 14, z: 34 },
+    { x: 0, y: 12, z: 40 },
+  ];
+  const tl = gsap.timeline({
+    defaults: { duration: 3.1, ease: 'power2.inOut' },
+    onComplete: () => {
+      controls.enabled = true;
+      controls.target.set(0, 4, 0);
+    },
+  });
+  tl.to(camera.position, { x: path[1].x, y: path[1].y, z: path[1].z, duration: 3.6 })
+    .to(camera.position, { x: path[2].x, y: path[2].y, z: path[2].z, duration: 3.4 }, '-=0.2')
+    .to(camera.position, { x: path[3].x, y: path[3].y, z: path[3].z, duration: 2.6 }, '-=0.2');
+}
+
+// ---------- Animation loop ----------
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const dt = clock.getDelta();
+
+  skyMat.uniforms.uTime.value = t;
+  auroraMeshes.forEach((m) => { m.material.uniforms.uTime.value = t; });
+
+  // islands bobbing
+  islands.forEach((isl) => {
+    isl.position.y = isl.userData.baseY + Math.sin(t * isl.userData.bobSpeed + isl.userData.bobOffset) * 0.6;
+    isl.rotation.y += 0.0006;
+  });
+
+  // core rotation — spins faster and glows brighter once the portal wakes
+  const portalPulse = gameState.portalActive ? 1 : 0;
+  coreGroup.rotation.y += 0.0015 + portalPulse * 0.004;
+  ring1.rotation.z += 0.0035 + portalPulse * 0.01;
+  ring2.rotation.z -= 0.0022 + portalPulse * 0.008;
+  obelisk.rotation.y += 0.002;
+  obelisk.material.emissiveIntensity = 1.1 + portalPulse * (0.6 + Math.sin(t * 3) * 0.3);
+  coreLight.intensity = 5.5 + Math.sin(t * 1.6) * 0.8 + portalPulse * 3;
+
+  // exhibits orbit
+  exhibitMeshes.forEach((m) => {
+    const ang = m.userData.startAngle + t * m.userData.speed;
+    m.position.set(
+      Math.cos(ang) * m.userData.radius,
+      m.userData.yOff + Math.sin(t * 0.6 + m.userData.startAngle) * 0.4,
+      Math.sin(ang) * m.userData.radius
+    );
+    m.rotation.x += 0.01;
+    m.rotation.y += 0.014;
+    const targetScale = m === hovered ? 1.6 : 1.0;
+    m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, targetScale, 0.12));
+    m.material.emissiveIntensity = THREE.MathUtils.lerp(m.material.emissiveIntensity, m === hovered ? 2.0 : 0.9, 0.12);
+  });
+
+  // map fragments — pulse and slowly spin to stand out from scenery
+  fragmentMeshes.forEach((m) => {
+    if (m.userData.collected) return;
+    m.rotation.x += 0.012;
+    m.rotation.y += 0.018;
+    const pulse = 1 + Math.sin(t * 2.2 + m.userData.bobOffset) * 0.12;
+    m.scale.setScalar(pulse * (m === hovered ? 1.4 : 1));
+    m.material.emissiveIntensity = 1.1 + Math.sin(t * 2.2 + m.userData.bobOffset) * 0.4;
+  });
+
+  // wish-lights (visitor-planted) gentle bob + glow pulse
+  wishMeshes.forEach((m) => {
+    m.position.y = m.userData.baseY + Math.sin(t * m.userData.bobSpeed + m.userData.bobOffset) * 0.35;
+    m.rotation.y += 0.006;
+    const targetScale = m === hovered ? 1.7 : 1.0;
+    m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, targetScale, 0.12));
+    m.material.emissiveIntensity = THREE.MathUtils.lerp(m.material.emissiveIntensity, m === hovered ? 2.0 : 1.0, 0.12);
+  });
+
+  // fireflies drift
+  const posAttr = fireflyGeo.attributes.position;
+  for (let i = 0; i < fireflyCount; i++) {
+    const seed = fireflySeed[i];
+    posAttr.array[i * 3] = fireflyBasePos[i * 3] + Math.sin(t * 0.5 + seed) * 1.5;
+    posAttr.array[i * 3 + 1] = fireflyBasePos[i * 3 + 1] + Math.sin(t * 0.8 + seed * 2) * 1.2;
+    posAttr.array[i * 3 + 2] = fireflyBasePos[i * 3 + 2] + Math.cos(t * 0.5 + seed) * 1.5;
+  }
+  posAttr.needsUpdate = true;
+
+  // stream particles along bridges
+  const streamAttr = streamGeo.attributes.position;
+  streamData.forEach((sd, i) => {
+    sd.t += sd.speed * dt;
+    if (sd.t > 1) sd.t -= 1;
+    const p = bridgeCurves[sd.curveIndex].getPoint(sd.t);
+    streamAttr.array[i * 3] = p.x;
+    streamAttr.array[i * 3 + 1] = p.y;
+    streamAttr.array[i * 3 + 2] = p.z;
+  });
+  streamAttr.needsUpdate = true;
+
+  // raycast hover (only after intro so we don't fight the camera tween)
+  if (controls.enabled && !wishOverlay.classList.contains('visible') && !storyOverlay.classList.contains('visible')) {
+    raycaster.setFromCamera(pointer, camera);
+    let hitObj = null, eyebrow = '', title = '', body = '', isPointer = false;
+
+    if (gameState.chapter === 'varshal') {
+      const targets = exhibitMeshes.concat(wishMeshes).concat(fragmentMeshes.filter(m => !m.userData.collected));
+      const hits = raycaster.intersectObjects(targets);
+      if (hits.length > 0) {
+        hitObj = hits[0].object;
+        isPointer = true;
+        if (hitObj.userData.isWish) { eyebrow = 'A Light Left Behind'; title = hitObj.userData.title; body = hitObj.userData.body; }
+        else if (hitObj.userData.isFragment) { eyebrow = 'Map Fragment'; title = 'A piece of the way forward'; body = 'Tap to recover it.'; }
+        else { eyebrow = 'Exhibit'; title = hitObj.userData.title; body = hitObj.userData.body; }
+      } else if (raycaster.intersectObject(obelisk).length > 0) {
+        isPointer = true;
+        eyebrow = gameState.portalActive ? 'The Obelisk' : 'The Obelisk (dormant)';
+        title = gameState.portalActive ? 'The way to Meridian is open' : 'Still sleeping';
+        body = gameState.portalActive ? 'Tap to cross over.' : `Recover ${gameState.fragmentsTotal - gameState.fragmentsCollected} more fragment(s) to wake it.`;
+      }
+    } else {
+      const hits = raycaster.intersectObjects(meridianLandmarks.map(l => l.mesh));
+      if (hits.length > 0) {
+        const l = meridianLandmarks.find(x => x.mesh === hits[0].object);
+        hitObj = l.mesh; isPointer = true;
+        eyebrow = l.eyebrow; title = l.title; body = 'Tap to step inside.';
+      } else if (raycaster.intersectObject(returnBeacon).length > 0) {
+        hitObj = returnBeacon; isPointer = true;
+        eyebrow = 'The Beacon'; title = 'Return to VarShal'; body = 'Tap to travel back across the sky.';
+      }
+    }
+
+    if (hitObj) {
+      if (hovered !== hitObj) {
+        hovered = hitObj;
+        capEyebrow.textContent = eyebrow;
+        capTitle.textContent = title;
+        capBody.textContent = body;
+        captionEl.classList.add('visible');
+      }
+      canvas.style.cursor = isPointer ? 'pointer' : 'grab';
+    } else {
+      if (hovered) {
+        hovered = null;
+        captionEl.classList.remove('visible');
+      }
+      canvas.style.cursor = 'grab';
+    }
+  }
+
+  // Meridian: landmark markers, return beacon, traffic streaks
+  if (meridianGroup.visible) {
+    [archiveLandmark, showroomLandmark].forEach((l) => {
+      l.group.rotation.y += 0.0018;
+      const m = l.mesh;
+      m.rotation.x += 0.01;
+      m.rotation.y += 0.016;
+      const targetScale = m === hovered ? 1.6 : 1.0;
+      m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, targetScale, 0.12));
+      m.material.emissiveIntensity = THREE.MathUtils.lerp(m.material.emissiveIntensity, m === hovered ? 2.2 : 1.4, 0.12);
+    });
+
+    returnBeacon.rotation.y += 0.008;
+    returnBeacon.position.y = 3 + Math.sin(t * 0.8) * 0.4;
+    returnBeaconLight.position.y = returnBeacon.position.y;
+    const beaconScale = returnBeacon === hovered ? 1.4 : 1.0;
+    returnBeacon.scale.setScalar(THREE.MathUtils.lerp(returnBeacon.scale.x, beaconScale, 0.12));
+
+    const trafficAttr = trafficGeo.attributes.position;
+    trafficData.forEach((td, i) => {
+      td.angle += td.speed * 0.01;
+      trafficAttr.array[i * 3] = Math.cos(td.angle) * td.radius;
+      trafficAttr.array[i * 3 + 1] = td.height + Math.sin(t * 0.5 + i) * 0.6;
+      trafficAttr.array[i * 3 + 2] = Math.sin(td.angle) * td.radius;
+    });
+    trafficAttr.needsUpdate = true;
+  }
+
+  controls.update();
+  composer.render();
+}
+
+// ---------- Boot ----------
+function boot() {
+    
+  window.__VARSHAL_BOOTED = true;
+  updateHUD();
+  onResize();
+  animate();
+  startIntro();
+  gsap.to(loadingEl, {
+    opacity: 0, duration: 0.9, delay: 0.3,
+    onComplete: () => loadingEl.remove(),
+  });
+}
+
+// wait one frame so first paint isn't blank, then boot
+requestAnimationFrame(() => requestAnimationFrame(boot));
+</script>
+</body>
+</html>
